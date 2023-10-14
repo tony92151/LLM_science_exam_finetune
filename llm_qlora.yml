@@ -9,11 +9,12 @@ load_in_4bit: true
 strict: false
 
 datasets:
-  - path: mhenrichsen/alpaca_2k_test
+  - path: "./llm-science-exam-data-w-thought/train_.csv"
     type: alpaca
 dataset_prepared_path: last_run_prepared
 val_set_size: 0.01
 output_dir: ./qlora-out
+
 
 adapter: qlora
 lora_model_dir:
@@ -22,7 +23,7 @@ sequence_len: 8192
 sample_packing: true
 pad_to_sequence_len: true
 
-lora_r: 16
+lora_r: 8
 lora_alpha: 16
 lora_dropout: 0.05
 lora_target_linear: true
@@ -43,7 +44,7 @@ wandb_run_id:
 wandb_log_model:
 
 gradient_accumulation_steps: 8
-micro_batch_size: 2
+micro_batch_size: 1
 num_epochs: 2
 optimizer: paged_adamw_8bit
 lr_scheduler: cosine
@@ -51,7 +52,7 @@ learning_rate: 0.0002
 
 train_on_inputs: false
 group_by_length: false
-bf16: true
+bf16: false
 fp16: false
 tf32: false
 
@@ -61,7 +62,7 @@ resume_from_checkpoint:
 local_rank:
 logging_steps: 1
 xformers_attention:
-flash_attention: true
+flash_attention: false
 
 warmup_steps: 10
 eval_steps: 20
