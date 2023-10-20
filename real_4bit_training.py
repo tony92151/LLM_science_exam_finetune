@@ -1,19 +1,23 @@
 import os
-
+import time
 import bitsandbytes as bnb
 import pandas as pd
 import torch
 import transformers
 from datasets import Dataset, load_dataset
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, AutoPeftModelForCausalLM, PeftConfig, PeftModel
 from transformers import (AutoModelForCausalLM, AutoTokenizer,
                           BitsAndBytesConfig)
 
 # model_id = "EleutherAI/gpt-neox-20b"
 # model_id = "elinas/llama-7b-hf-transformers-4.29"
-# model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-model_id = "Open-Orca/Mistral-7B-OpenOrca"
+model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+# model_id = "Open-Orca/Mistral-7B-OpenOrca"
 # model_id = "Open-Orca/OpenOrca-Platypus2-13B"
+
+
+lora_output_dir = "./output20"
+PREFIX_CHECKPOINT_DIR = "checkpoint"
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -72,7 +76,7 @@ target_modules = find_linear_layers(model)
 # target_modules=["q_proj","v_proj","k_proj","o_proj","gate_proj","down_proj","up_proj"]
 
 config = LoraConfig(
-    r=8,
+    r=16,
     lora_alpha=32,
     target_modules=target_modules,
     modules_to_save=["embed_tokens", "lm_head"],
@@ -86,14 +90,15 @@ print_trainable_parameters(model)
 
 
 train_df = pd.read_csv(
-    "./llm-science-exam-data-w-thought/train.csv", dtype={"useful": bool}
+    "./llm-science-exam-data-w-thought/train_.csv", dtype={"useful": bool}
 )
-extra_train_df = pd.read_csv(
-    "./llm-science-exam-data-w-thought/extra_train_set.csv", dtype={"useful": bool}
-)
+# extra_train_df = pd.read_csv(
+#     "./llm-science-exam-data-w-thought/extra_train_set.csv", dtype={"useful": bool}
+# )
 
 
-concat_df = pd.concat([train_df, extra_train_df], axis=0)
+# concat_df = pd.concat([train_df, extra_train_df], axis=0)
+concat_df = train_df
 
 
 concat_df.shape
@@ -120,12 +125,12 @@ data = Dataset.from_pandas(concat_df)
 # data = data.map(lambda samples: tokenizer(samples["quote"]), batched=True)
 
 
-CUTOFF_LEN = 2048
+CUTOFF_LEN = 4096
 
 
 def generate_prompt(data_point):
     return f"""### Comment: You are a helpful bot that answer a multiple choice question with options [A, B, C, D, E] if background provided. 
-Please determine whether the background knowledge is useful first, if it is useful, please answer the question based on the background knowledge, otherwise, please answer the question and ignore the background knowledge. **You only allowed reply in following format, for example "useful:True||though:Because...||answer:A" . The "useful" is a boolean value, "thought" is your reasoning thought about the question and the answer which should be one of [A, B, C, D, E].**
+Please determine whether the background knowledge is useful first, if it is useful, please answer the question based on the background knowledge, otherwise, please answer the question and ignore the background knowledge. **You only allowed reply in following format, for example "useful:True||thought:Because...||answer:A" . The "useful" is a boolean value, "thought" is your reasoning thought about the question and the answer which should be one of [A, B, C, D, E].**
 Background knowledge: {data_point["context"]}
 ### Human:
 Question: {data_point["prompt"]}
@@ -135,7 +140,7 @@ C {data_point["C"]}
 D {data_point["D"]}
 E {data_point["E"]}
 ### REPLY:
-useful:{data_point['useful']}||though:{data_point['thought']}||answer:{data_point['answer']}### END."""
+useful:{data_point['useful']}||thought:{data_point['thought']}||answer:{data_point['answer']}[</END>] """
 
 
 # EXAMPLE
@@ -183,13 +188,18 @@ def tokenize(prompt, add_eos_token=True):
     return result
 
 
+# print(f"{tokenizer.eos_token_id=}")
+# print(f"{tokenizer.sos_token_id=}")
+
 def generate_and_tokenize_prompt(data_point):
     full_prompt = generate_prompt(data_point)
-    tokenized_full_prompt = tokenize(full_prompt, add_eos_token=False)
+    tokenized_full_prompt = tokenize(full_prompt, add_eos_token=True)
+#     print(tokenizer.decode(tokenized_full_prompt["input_ids"]))
+#     exit()
     return tokenized_full_prompt
 
 
-generate_and_tokenize_prompt(data[0])
+# generate_and_tokenize_prompt(data[0])
 
 
 data.shuffle()
@@ -198,8 +208,6 @@ data.shuffle()
 data = data.map(lambda samples: generate_and_tokenize_prompt(samples))
 
 
-lora_output_dir = "./output8"
-PREFIX_CHECKPOINT_DIR = "checkpoint"
 
 
 class SavePeftModelCallback(transformers.TrainerCallback):
@@ -224,7 +232,10 @@ class SavePeftModelCallback(transformers.TrainerCallback):
     def on_train_end(self, args, state, control, **kwargs):
         peft_model_path = os.path.join(args.output_dir, "sft_lora_model")
         kwargs["model"].save_pretrained(peft_model_path)
-        kwargs["tokenizer"].save_pretrained(peft_model_path)
+        if "tokenizer" in kwargs and kwargs["tokenizer"] is not None: 
+            kwargs["tokenizer"].save_pretrained(peft_model_path)
+        else:
+            print("Tokenizer not provided in kwargs!")
 
 
 # needed for gpt-neo-x tokenizer
@@ -235,17 +246,19 @@ trainer = transformers.Trainer(
     train_dataset=data,
     args=transformers.TrainingArguments(
         per_device_train_batch_size=1,
-        gradient_accumulation_steps=8,
+        gradient_accumulation_steps=4,
         # warmup_steps=2,
         warmup_ratio=0.03,
         # max_steps=20,
-        num_train_epochs=2,
+        num_train_epochs=0.1,
         learning_rate=2e-4,
         fp16=True,
         logging_steps=10,
         save_strategy="steps",
         output_dir=lora_output_dir,
-        optim="paged_adamw_8bit",
+        optim = "paged_adamw_8bit",
+        lr_scheduler_type = "cosine",
+        report_to=None,
     ),
     data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
 )
@@ -256,4 +269,24 @@ model.config.use_cache = False  # silence the warnings. Please re-enable for inf
 
 trainer.train()
 
-trainer.model.save_pretrained("./llama2_7b_lora")
+model.cpu()
+del model
+
+##
+print("Merge and save...")
+time.sleep(1)
+
+model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
+
+peft_model_id = os.path.join(lora_output_dir, "sft_lora_model")
+
+config = PeftConfig.from_pretrained(peft_model_id)
+model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.bfloat16)
+
+model = model.merge_and_unload()
+
+merged_model_path = os.path.join(lora_output_dir, "merged_model")
+model.save_pretrained(merged_model_path, max_shard_size="2GB")
+
+if True:
+    tokenizer.save_pretrained(merged_model_path)
