@@ -2,7 +2,7 @@ accelerate launch --config_file=./accelerate_config/yao.yaml finetune.py \
     --model_name Open-Orca/Mistral-7B-OpenOrca \
     --dataset_name ./llm-science-exam-data-w-thought/train_.csv \
     --dataset_text_field text \
-    --gradient_accumulation_steps 8 \
+    --gradient_accumulation_steps 4 \
     --learning_rate 2e-4 \
     --batch_size 8 \
     --seq_length 2048 \
