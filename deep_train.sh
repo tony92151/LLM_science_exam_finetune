@@ -1,4 +1,4 @@
-accelerate launch --config_file=./deepspeed/deepspeed_zero2.yaml --num_processes 2 finetune.py \
+accelerate launch --config_file=./accelerate_config/yao.yaml finetune.py \
     --model_name Open-Orca/Mistral-7B-OpenOrca \
     --dataset_name ./llm-science-exam-data-w-thought/train_.csv \
     --dataset_text_field text \
