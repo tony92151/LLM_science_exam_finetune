@@ -89,7 +89,7 @@ class ScriptArguments:
     push_to_hub: Optional[bool] = field(default=False, metadata={"help": "Push the model to HF Hub"})
     hub_model_id: Optional[str] = field(default=None, metadata={"help": "The name of the model on HF Hub"})
     use_flash_attention_2: Optional[bool] = field(default=False, metadata={"help": "Wether to use flash attention 2 (flash-attn==2.2.4)"})
-    neft_noise_alpha: Optional[int] = field(default=0, metadata={"help": "the alpha parameter of the NeFT noise alpha"})
+    neft_noise_alpha: Optional[int] = field(default=0, metadata={"help": "the alpha parameter of the NeFT noise alpha (0 to disable)"})
 
 # trainer = transformers.Trainer(
 #     model=model,
