@@ -88,8 +88,8 @@ class ScriptArguments:
     save_total_limit: Optional[int] = field(default=10, metadata={"help": "Limits total number of checkpoints."})
     push_to_hub: Optional[bool] = field(default=False, metadata={"help": "Push the model to HF Hub"})
     hub_model_id: Optional[str] = field(default=None, metadata={"help": "The name of the model on HF Hub"})
+    use_flash_attention_2: Optional[bool] = field(default=False, metadata={"help": "Wether to use flash attention 2 (flash-attn==2.2.4)"})
 
-# %% [code] {"execution":{"iopub.status.busy":"2023-10-16T13:11:41.149976Z","iopub.execute_input":"2023-10-16T13:11:41.150717Z","iopub.status.idle":"2023-10-16T13:11:41.164713Z","shell.execute_reply.started":"2023-10-16T13:11:41.150684Z","shell.execute_reply":"2023-10-16T13:11:41.163795Z"}}
 # trainer = transformers.Trainer(
 #     model=model,
 #     train_dataset=data,
@@ -174,7 +174,7 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=script_args.trust_remote_code,
     torch_dtype=torch_dtype,
     use_auth_token=script_args.use_auth_token,
-    
+    use_flash_attention_2=script_args.use_flash_attention_2
 )
 
 # %% [code]
