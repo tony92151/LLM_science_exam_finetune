@@ -161,8 +161,8 @@ elif script_args.load_in_8bit or script_args.load_in_4bit:
     # Copy the model to each device
     device_map = {"": Accelerator().local_process_index}
     # device_map="auto"
-#     torch_dtype = torch.bfloat16
-    torch_dtype = torch.float16
+    torch_dtype = torch.bfloat16
+    # torch_dtype = torch.float16
 else:
     device_map = None
     quantization_config = None
@@ -246,7 +246,8 @@ def find_linear_layers(model):
     print(f"LoRA module names: {list(lora_module_names)}")
     return list(lora_module_names)
 
-target_modules = find_linear_layers(model)
+# target_modules = find_linear_layers(model)
+target_modules = ["q_proj", "v_proj"]
 
 if script_args.use_peft:
     print("Use peft")
@@ -264,7 +265,7 @@ else:
 
 
 if script_args.neft_noise_alpha == 0:
-    script_args.neftune_noise_alpha = None
+    script_args.neft_noise_alpha = None
 
 
 # Step 5: Define the Trainer
@@ -275,7 +276,9 @@ trainer = SFTTrainer(
     train_dataset=dataset,
     dataset_text_field=script_args.dataset_text_field,
     peft_config=peft_config,
-    neftune_noise_alpha=script_args.neftune_noise_alpha,
+    #neftune_noise_alpha=script_args.neft_noise_alpha,
+    #neftune_noise_alpha=5,
+    packing=True,
 )
 
 
